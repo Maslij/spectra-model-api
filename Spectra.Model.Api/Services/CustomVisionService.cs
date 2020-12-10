@@ -128,6 +128,11 @@ namespace Spectra.Model.Api.Services
                 count++;
             }
 
+            // Clean-up
+            DirectoryInfo dInfo = new DirectoryInfo(_startPath);
+            foreach (FileInfo file in dInfo.GetFiles())
+                file.Delete();
+
             var response = new
             {
                 project_id = projectId,
