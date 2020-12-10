@@ -63,15 +63,26 @@ namespace Spectra.Model.Api.Services
             return await trainingApi.GetProjectsAsync();
         }
 
+        public async Task<Project> GetProject(CustomVisionProject project, Guid projectId)
+        {
+            CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
+            return await trainingApi.GetProjectAsync(projectId);
+        }
+
         public async Task<object> GetZippedProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId)
         {
             CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
             CloudBlobClient blobClient = InitiateBlobClient();
             CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference($"spectra-{Guid.NewGuid()}");
             await cloudBlobContainer.CreateAsync();
+            var containerPermissions = new BlobContainerPermissions();
+            containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
+            cloudBlobContainer.SetPermissions(containerPermissions);
 
+            var currentProject = await trainingApi.GetProjectAsync(projectId);
             var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId);
 
+            int count = 0;
             var _path = Path.GetTempPath();
             var _startPath = $"{_path}/Images";
             string _fileName = $"{projectId}.zip";
@@ -79,6 +90,7 @@ namespace Spectra.Model.Api.Services
 
             if (!Directory.Exists(_startPath))
                 Directory.CreateDirectory(_startPath);
+            Dictionary<string, object> _blobDirectory = new Dictionary<string, object>();
 
             foreach (Image image in projectWithImagesAndRegions)
             {
@@ -86,6 +98,7 @@ namespace Spectra.Model.Api.Services
                 var _imageFileName = $"{image.Id}.jpg";
                 var _jsonPath = $"{_startPath}/{_jsonFileName}";
                 var _imagePath = $"{_startPath}/{_imageFileName}";
+
 
                 // Download the Image URL
                 using (WebClient wc = new WebClient())
@@ -103,11 +116,24 @@ namespace Spectra.Model.Api.Services
                 }
                 CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(_jsonFileName);
                 await cloudBlockBlob.UploadFromFileAsync(_jsonPath);
+
+                var imageLinks = new
+                {
+                    image_uri = cloudBlockBlobImage.Uri,
+                    annotations_uri = cloudBlockBlob.Uri
+                };
+
+                _blobDirectory.Add($"image_{count}", imageLinks);
+
+                count++;
             }
 
             var response = new
             {
-                ProjectImages = cloudBlobContainer.Uri
+                project_id = projectId,
+                project_name = currentProject.Name,
+                image_count = count,
+                project_images = _blobDirectory
             };
 
             return response;
