@@ -189,20 +189,23 @@ namespace Spectra.Model.Api.Services
 
                 List<Models.Pascal.Object> imageObjects = new List<Models.Pascal.Object>();
 
-                foreach (ImageRegion region in image.Regions)
+                if(image.Regions != null)
                 {
-                    BoundBox newBounds = new BoundBox
+                    foreach (ImageRegion region in image.Regions)
                     {
-                        Xmin = region.Left * region.Width,
-                        Ymin = region.Top * region.Height,
-                        Xmax = region.Width * region.Width,
-                        Ymax = region.Height * region.Height
-                    };
-                    imageObjects.Add(new Models.Pascal.Object 
-                    { 
-                        Name = region.TagName,
-                        Bndbox = newBounds
-                    });
+                        BoundBox newBounds = new BoundBox
+                        {
+                            Xmin = region.Left * region.Width,
+                            Ymin = region.Top * region.Height,
+                            Xmax = region.Width * region.Width,
+                            Ymax = region.Height * region.Height
+                        };
+                        imageObjects.Add(new Models.Pascal.Object
+                        {
+                            Name = region.TagName,
+                            Bndbox = newBounds
+                        });
+                    }
                 }
 
                 // Create the Pascal Annotation
