@@ -8,7 +8,7 @@ namespace Spectra.Model.Api.Models
     {
         [JsonProperty("BatchImage")]
         [Required]
-        public List<CustomVisionImage> BatchImage { get; set; }
+        public CustomVisionImage[] BatchImage { get; set; }
     }
 
     public class CustomVisionImage

@@ -122,7 +122,7 @@ namespace Spectra.Model.Api.Services
             
             foreach (ImageCreateResult image in isUploaded.Result.Images)
             {
-                createdImageUris.Add(image.SourceUrl);
+                createdImageUris.Add(image.Image.OriginalImageUri);
             }
 
             var response = new
