@@ -46,7 +46,6 @@ C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netco
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Microsoft.Rest.ClientRuntime.Azure.dll
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Newtonsoft.Json.dll
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Microsoft.WindowsAzure.Storage.dll
-C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.csprojAssemblyReference.cache
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.AssemblyInfoInputs.cache
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.AssemblyInfo.cs
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.csproj.CoreCompileInputs.cache
@@ -58,3 +57,4 @@ C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netco
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.dll
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.pdb
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.genruntimeconfig.cache
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.csprojAssemblyReference.cache

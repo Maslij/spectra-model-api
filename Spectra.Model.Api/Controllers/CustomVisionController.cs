@@ -1,16 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Reflection;
-using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.CognitiveServices.Vision.CustomVision.Training.Models;
 using Spectra.Model.Api.Models;
 using Spectra.Model.Api.Services;
-using System.IO.Compression;
 
 namespace Spectra.Model.Api.Controllers
 {
@@ -33,13 +28,30 @@ namespace Spectra.Model.Api.Controllers
             return await _customVisionService.GetProjects(customVisionProject);
         }
 
-        [Route("project/{id}/images")]
+        [Route("project/{id}/images/customvision")]
         [HttpGet]
-        public async Task<object> GetZippedProjectWithImagesAndRegions(CustomVisionProject customVisionProject,Guid id)
+        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject customVisionProject, Guid id)
         {
-            var response = await _customVisionService.GetZippedProjectWithImagesAndRegions(customVisionProject, id);
+            var response = await _customVisionService.GetProjectWithImagesAndRegions(customVisionProject, id);
 
             return response;
+        }
+
+        [Route("project/{id}/images/pascal")]
+        [HttpGet]
+        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject customVisionProject, Guid id)
+        {
+            var response = await _customVisionService.GetProjectWithImageAndPascalAnnotations(customVisionProject, id);
+
+            return response;
+        }
+
+        [Route("project/{id}/images/upload")]
+        [HttpPost]
+        public async Task<object> UploadImageToAzure(CustomVisionBatchImage customVisionBatchImage, Guid id)
+        {
+            var response = await _customVisionService.UploadImageToAzure(customVisionBatchImage, id);
+            return response;                                          
         }
     }
 }

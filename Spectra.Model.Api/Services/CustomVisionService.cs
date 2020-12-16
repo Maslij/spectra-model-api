@@ -11,9 +11,33 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Net;
+using Spectra.Model.Api.Models.Pascal;
+using System.Xml.Serialization;
+using System.Text;
+using System.Xml.Linq;
+using System.Xml;
 
 namespace Spectra.Model.Api.Services
 {
+    public static class Extensions
+    {
+        public static T[] Append<T>(this T[] array, T item)
+        {
+            if (array == null)
+            {
+                return new T[] { item };
+            }
+
+            T[] result = new T[array.Length + 1];
+            for (int i = 0; i < array.Length; i++)
+            {
+                result[i] = array[i];
+            }
+
+            result[array.Length] = item;
+            return result;
+        }
+    }
     public class CustomVisionService
     {
 
@@ -69,15 +93,203 @@ namespace Spectra.Model.Api.Services
             return await trainingApi.GetProjectAsync(projectId);
         }
 
-        public async Task<object> GetZippedProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId)
+        public static bool DoesFileExist(string fileName, CloudBlobClient cloudBlobClient, string containerReference)
+        {
+            return cloudBlobClient.GetContainerReference(containerReference).GetBlockBlobReference(fileName).Exists();
+        }
+
+        public static Uri GetBlobUrl(string fileName, CloudBlobClient cloudBlobClient, string containerReference)
+        {
+            return cloudBlobClient.GetContainerReference(containerReference).GetBlockBlobReference(fileName).Uri;
+        }
+        
+        public async Task<object> UploadImageToAzure(CustomVisionBatchImage customVisionBatchImage, Guid projectId)
+        {
+            CustomVisionTrainingClient trainingApi = AuthenticateTraining(customVisionBatchImage.Endpoint, customVisionBatchImage.TrainingKey);
+            var currentProject = await trainingApi.GetProjectAsync(projectId);
+
+            // Create the ImageUrlBatch to send to CustomVision
+            List<ImageUrlCreateEntry> singleUrlEntry = new List<ImageUrlCreateEntry>();
+
+            foreach(CustomVisionImage customVisionImage in customVisionBatchImage.BatchImage)
+            {
+                singleUrlEntry.Add(new ImageUrlCreateEntry(customVisionImage.ImageUri));
+            }
+
+            ImageUrlCreateBatch batchEntry = new ImageUrlCreateBatch(singleUrlEntry);
+            var isUploaded = trainingApi.CreateImagesFromUrlsAsync(projectId, batchEntry);
+            List<string> createdImageUris = new List<string>();
+            
+            foreach (ImageCreateResult image in isUploaded.Result.Images)
+            {
+                createdImageUris.Add(image.SourceUrl);
+            }
+
+            var response = new
+            {
+                project_id = projectId,
+                project_name = currentProject.Name,
+                image_count = isUploaded.Result.Images.Count,
+                image_create_result = createdImageUris
+            };
+
+            return response;
+
+        }
+
+        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject project, Guid projectId)
         {
             CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
             CloudBlobClient blobClient = InitiateBlobClient();
-            CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference($"spectra-{Guid.NewGuid()}");
-            await cloudBlobContainer.CreateAsync();
-            var containerPermissions = new BlobContainerPermissions();
-            containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
-            cloudBlobContainer.SetPermissions(containerPermissions);
+
+            string containerReference = $"{projectId}";
+            CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference(containerReference);
+
+            // Create the container if it doesn't exist
+            if (!cloudBlobContainer.Exists())
+            {
+                await cloudBlobContainer.CreateAsync();
+                var containerPermissions = new BlobContainerPermissions();
+                containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
+                cloudBlobContainer.SetPermissions(containerPermissions);
+            }
+
+            var currentProject = await trainingApi.GetProjectAsync(projectId);
+            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId);
+
+            int count = 0;
+            var _path = Path.GetTempPath();
+            var _startPath = $"{_path}/Images";
+            string _fileName = $"{projectId}.zip";
+            //string _zipPath = $"{_path}/Images/{_fileName}";
+
+            if (!Directory.Exists(_startPath))
+                Directory.CreateDirectory(_startPath);
+            Dictionary<string, object> _blobDirectory = new Dictionary<string, object>();
+
+            foreach (Image image in projectWithImagesAndRegions)
+            {
+                var _xmlFileName = $"{image.Id}.xml";
+                var _imageFileName = $"{image.Id}.jpg";
+                var _xmlPath = $"{_startPath}/{_xmlFileName}";
+                var _imagePath = $"{_startPath}/{_imageFileName}";
+
+
+                // Download the Image URL
+                using (WebClient wc = new WebClient())
+                {
+                    wc.DownloadFile(image.OriginalImageUri, _imagePath);
+                }
+                CloudBlockBlob cloudBlockBlobImage = cloudBlobContainer.GetBlockBlobReference(_imageFileName);
+
+                // Check if the file already exits in the blob
+                bool imageUrl = DoesFileExist(_imageFileName, blobClient, containerReference);
+                if (!imageUrl)
+                    await cloudBlockBlobImage.UploadFromFileAsync(_imagePath);
+
+                List<Models.Pascal.Object> imageObjects = new List<Models.Pascal.Object>();
+
+                foreach (ImageRegion region in image.Regions)
+                {
+                    BoundBox newBounds = new BoundBox
+                    {
+                        Xmin = region.Left * region.Width,
+                        Ymin = region.Top * region.Height,
+                        Xmax = region.Width * region.Width,
+                        Ymax = region.Height * region.Height
+                    };
+                    imageObjects.Add(new Models.Pascal.Object 
+                    { 
+                        Name = region.TagName,
+                        Bndbox = newBounds
+                    });
+                }
+
+                // Create the Pascal Annotation
+                var pascalAnnotationFile = new Annotation
+                {
+
+                    Folder = "",
+                    FileName = _xmlFileName,
+                    Source = new Source { Database = "" },
+                    Size = new Size
+                    {
+                        Depth = 3,
+                        Width = image.Width,
+                        Height = image.Height,
+                    },
+                    Objects = imageObjects
+                };
+
+                // Create the PASCAL VOC Annotation file
+
+                XmlSerializer x = new System.Xml.Serialization.XmlSerializer(pascalAnnotationFile.GetType());
+
+                using Stream writer = new FileStream(_xmlPath, FileMode.OpenOrCreate);
+                {
+                    x.Serialize(writer, pascalAnnotationFile);
+                    writer.Close();
+                }
+
+                // Fix the formatting
+                XElement xmlDoc = XElement.Load(_xmlPath);
+                XElement nodeToRemove = xmlDoc.Element("Objects");
+                var childNodes = nodeToRemove.Elements();
+                nodeToRemove.Remove();
+                xmlDoc.Add(childNodes);
+
+                using Stream newWriter = new FileStream(_xmlPath, FileMode.OpenOrCreate);
+                {
+                    xmlDoc.Save(newWriter);
+                    newWriter.Close();
+                }
+
+                CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(_xmlFileName);
+                await cloudBlockBlob.UploadFromFileAsync(_xmlPath);
+                Uri jsonUrl = GetBlobUrl(_xmlFileName, blobClient, containerReference);
+
+                var imageLinks = new
+                {
+                    image_uri = cloudBlockBlobImage.Uri,
+                    annotations_uri = cloudBlockBlob.Uri
+                };
+
+                _blobDirectory.Add($"image_{count}", imageLinks);
+
+                count++;
+            }
+
+            // Clean-up
+            DirectoryInfo dInfo = new DirectoryInfo(_startPath);
+            foreach (FileInfo file in dInfo.GetFiles())
+                file.Delete();
+
+            var response = new
+            {
+                project_id = projectId,
+                project_name = currentProject.Name,
+                image_count = count,
+                project_images = _blobDirectory
+            };
+
+
+            return response;
+        }
+
+        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId)
+        {
+            CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
+            CloudBlobClient blobClient = InitiateBlobClient();
+            CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference($"{projectId}");
+
+            // Create the container if it doesn't exist
+            if (!cloudBlobContainer.Exists())
+            {
+                await cloudBlobContainer.CreateAsync();
+                var containerPermissions = new BlobContainerPermissions();
+                containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
+                cloudBlobContainer.SetPermissions(containerPermissions);
+            }
 
             var currentProject = await trainingApi.GetProjectAsync(projectId);
             var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId);
