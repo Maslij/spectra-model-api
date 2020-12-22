@@ -13,9 +13,8 @@ using System.Threading.Tasks;
 using System.Net;
 using Spectra.Model.Api.Models.Pascal;
 using System.Xml.Serialization;
-using System.Text;
 using System.Xml.Linq;
-using System.Xml;
+using System.IO.Compression;
 
 namespace Spectra.Model.Api.Services
 {
@@ -160,6 +159,7 @@ namespace Spectra.Model.Api.Services
             int count = 0;
             var _path = Path.GetTempPath();
             var _startPath = $"{_path}/Images";
+            var _zippedPath = $"{_path}/Zip";
             string _fileName = $"{projectId}.zip";
             //string _zipPath = $"{_path}/Images/{_fileName}";
 
@@ -261,9 +261,18 @@ namespace Spectra.Model.Api.Services
 
                 count++;
             }
+            // Finally, zip the directory.
+            string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
+
+            // Upload the zip file to Azure
+            Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
 
             // Clean-up
             DirectoryInfo dInfo = new DirectoryInfo(_startPath);
+            foreach (FileInfo file in dInfo.GetFiles())
+                file.Delete();
+
+            dInfo = new DirectoryInfo(_zippedPath);
             foreach (FileInfo file in dInfo.GetFiles())
                 file.Delete();
 
@@ -272,11 +281,40 @@ namespace Spectra.Model.Api.Services
                 project_id = projectId,
                 project_name = currentProject.Name,
                 image_count = count,
+                zipped_project = zippedFileUri,
                 project_images = _blobDirectory
             };
 
 
             return response;
+        }
+        public async Task<Uri> UploadBlobToAzure(CloudBlobContainer cloudBlobContainer, string filePath, string fileName)
+        {
+            CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(fileName);
+            await cloudBlockBlob.UploadFromFileAsync(filePath);
+            return cloudBlobContainer.GetBlockBlobReference(fileName).Uri;
+        }
+
+        public string ZipAndUploadDirectory(string startPath, string zipPath)
+        {
+            using (FileStream zipToOpen = new FileStream(zipPath, FileMode.Create))
+            using (ZipArchive archive = new ZipArchive(zipToOpen, ZipArchiveMode.Create))
+            {
+                foreach (var file in Directory.GetFiles(startPath))
+                {
+                    var entryName = Path.GetFileName(file);
+                    var entry = archive.CreateEntry(entryName);
+                    using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (var stream = entry.Open())
+                    {
+                        fs.CopyTo(stream, 81920);
+                    }
+                }
+            }
+
+            //byte[] fileBytes = System.IO.File.ReadAllBytes(_zipPath);
+
+            return zipPath;
         }
 
         public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId)
@@ -300,11 +338,14 @@ namespace Spectra.Model.Api.Services
             int count = 0;
             var _path = Path.GetTempPath();
             var _startPath = $"{_path}/Images";
+            var _zippedPath = $"{_path}/Zip";
             string _fileName = $"{projectId}.zip";
             //string _zipPath = $"{_path}/Images/{_fileName}";
 
             if (!Directory.Exists(_startPath))
                 Directory.CreateDirectory(_startPath);
+            if (!Directory.Exists(_zippedPath))
+                Directory.CreateDirectory(_zippedPath);
             Dictionary<string, object> _blobDirectory = new Dictionary<string, object>();
 
             foreach (Image image in projectWithImagesAndRegions)
@@ -343,8 +384,18 @@ namespace Spectra.Model.Api.Services
                 count++;
             }
 
+            // Finally, zip the directory.
+            string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
+
+            // Upload the zip file to Azure
+            Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
+
             // Clean-up
             DirectoryInfo dInfo = new DirectoryInfo(_startPath);
+            foreach (FileInfo file in dInfo.GetFiles())
+                file.Delete();
+
+            dInfo = new DirectoryInfo(_zippedPath);
             foreach (FileInfo file in dInfo.GetFiles())
                 file.Delete();
 
@@ -353,6 +404,7 @@ namespace Spectra.Model.Api.Services
                 project_id = projectId,
                 project_name = currentProject.Name,
                 image_count = count,
+                zipped_project = zippedFileUri,
                 project_images = _blobDirectory
             };
 

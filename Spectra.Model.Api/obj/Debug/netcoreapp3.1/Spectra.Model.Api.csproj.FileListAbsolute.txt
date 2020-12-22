@@ -30,7 +30,6 @@ C:\Users\Alec\source\repos\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcore
 C:\Users\Alec\source\repos\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.csprojAssemblyReference.cache
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\appsettings.Development.json
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\appsettings.json
-C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Properties\launchSettings.json
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Spectra.Model.Api.exe
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Spectra.Model.Api.deps.json
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Spectra.Model.Api.runtimeconfig.json
@@ -58,3 +57,4 @@ C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netco
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.pdb
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.genruntimeconfig.cache
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\Spectra.Model.Api.csprojAssemblyReference.cache
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\obj\Debug\netcoreapp3.1\scopedcss\bundle\Spectra.Model.Api.styles.css
