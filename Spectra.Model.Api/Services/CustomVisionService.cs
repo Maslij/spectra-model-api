@@ -281,8 +281,7 @@ namespace Spectra.Model.Api.Services
                 project_id = projectId,
                 project_name = currentProject.Name,
                 image_count = count,
-                zipped_project = zippedFileUri,
-                project_images = _blobDirectory
+                zipped_project = zippedFileUri
             };
 
 
@@ -404,8 +403,7 @@ namespace Spectra.Model.Api.Services
                 project_id = projectId,
                 project_name = currentProject.Name,
                 image_count = count,
-                zipped_project = zippedFileUri,
-                project_images = _blobDirectory
+                zipped_project = zippedFileUri
             };
 
             return response;
