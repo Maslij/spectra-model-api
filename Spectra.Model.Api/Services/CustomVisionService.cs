@@ -152,9 +152,9 @@ namespace Spectra.Model.Api.Services
                 containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
                 cloudBlobContainer.SetPermissions(containerPermissions);
             }
-
+            var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
             var currentProject = await trainingApi.GetProjectAsync(projectId);
-            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId);
+            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
 
             int count = 0;
             var _path = Path.GetTempPath();
@@ -330,9 +330,9 @@ namespace Spectra.Model.Api.Services
                 containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
                 cloudBlobContainer.SetPermissions(containerPermissions);
             }
-
+            var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
             var currentProject = await trainingApi.GetProjectAsync(projectId);
-            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId);
+            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
 
             int count = 0;
             var _path = Path.GetTempPath();
