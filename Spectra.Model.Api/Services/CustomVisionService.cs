@@ -158,10 +158,19 @@ namespace Spectra.Model.Api.Services
 
             IList<Image> projectWithImagesAndRegions = new List<Image>();
 
-            for (int i = 0; i < imageCount; i = i + 1)
+            for (int i = 0; i < imageCount; i = i + 100)
             {
-                var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: 1, skip: i);
-                projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
+                var diff = Math.Abs((decimal)(i - imageCount));
+                if (diff < 100)
+                {
+                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
+                    projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(smallSplitProjectWithImagesAndRegions).ToList();
+                }
+                else
+                {
+                    var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
+                    projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
+                }
             }
 
             int count = 0;
@@ -342,10 +351,19 @@ namespace Spectra.Model.Api.Services
             var currentProject = await trainingApi.GetProjectAsync(projectId);
 
             IList<Image> projectWithImagesAndRegions = new List<Image>();
-            for (int i=0; i < imageCount; i=i+1)
+            for (int i=0; i < imageCount; i=i+100)
             {
-                var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take:1, skip: i);
-                projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
+                var diff = Math.Abs((decimal)(i - imageCount));
+                if (diff < 100)
+                {
+                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
+                    projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(smallSplitProjectWithImagesAndRegions).ToList();
+                }
+                else
+                {
+                    var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
+                    projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
+                }
             }
             
             //var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
