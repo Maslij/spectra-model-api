@@ -15,6 +15,7 @@ using Spectra.Model.Api.Models.Pascal;
 using System.Xml.Serialization;
 using System.Xml.Linq;
 using System.IO.Compression;
+using System.Linq;
 
 namespace Spectra.Model.Api.Services
 {
@@ -154,7 +155,14 @@ namespace Spectra.Model.Api.Services
             }
             var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
             var currentProject = await trainingApi.GetProjectAsync(projectId);
-            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
+
+            IList<Image> projectWithImagesAndRegions = new List<Image>();
+
+            for (int i = 0; i < imageCount; i = i + 1)
+            {
+                var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: 1, skip: i);
+                projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
+            }
 
             int count = 0;
             var _path = Path.GetTempPath();
@@ -332,7 +340,15 @@ namespace Spectra.Model.Api.Services
             }
             var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
             var currentProject = await trainingApi.GetProjectAsync(projectId);
-            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
+
+            IList<Image> projectWithImagesAndRegions = new List<Image>();
+            for (int i=0; i < imageCount; i=i+1)
+            {
+                var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take:1, skip: i);
+                projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
+            }
+            
+            //var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
 
             int count = 0;
             var _path = Path.GetTempPath();
