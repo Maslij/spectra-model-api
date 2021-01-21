@@ -136,7 +136,7 @@ namespace Spectra.Model.Api.Services
 
         }
 
-        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject project, Guid projectId)
+        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId)
         {
             CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
             CloudBlobClient blobClient = InitiateBlobClient();
@@ -154,7 +154,7 @@ namespace Spectra.Model.Api.Services
             }
 
             var currentProject = await trainingApi.GetProjectAsync(projectId);
-            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId);
+            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId);
 
             int count = 0;
             var _path = Path.GetTempPath();
@@ -316,7 +316,7 @@ namespace Spectra.Model.Api.Services
             return zipPath;
         }
 
-        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId)
+        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId, Guid iterationId)
         {
             CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
             CloudBlobClient blobClient = InitiateBlobClient();
@@ -332,7 +332,7 @@ namespace Spectra.Model.Api.Services
             }
 
             var currentProject = await trainingApi.GetProjectAsync(projectId);
-            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId);
+            var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId);
 
             int count = 0;
             var _path = Path.GetTempPath();

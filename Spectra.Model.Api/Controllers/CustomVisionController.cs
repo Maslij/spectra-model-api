@@ -28,20 +28,20 @@ namespace Spectra.Model.Api.Controllers
             return await _customVisionService.GetProjects(customVisionProject);
         }
 
-        [Route("project/{id}/images/customvision")]
+        [Route("project/{id}/images/customvision/{iteration}")]
         [HttpGet]
-        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject customVisionProject, Guid id)
+        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject customVisionProject, Guid id, Guid iteration)
         {
-            var response = await _customVisionService.GetProjectWithImagesAndRegions(customVisionProject, id);
+            var response = await _customVisionService.GetProjectWithImagesAndRegions(customVisionProject, id, iteration);
 
             return response;
         }
 
-        [Route("project/{id}/images/pascal")]
+        [Route("project/{id}/images/pascal/{iteration}")]
         [HttpGet]
-        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject customVisionProject, Guid id)
+        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject customVisionProject, Guid id, Guid iteration)
         {
-            var response = await _customVisionService.GetProjectWithImageAndPascalAnnotations(customVisionProject, id);
+            var response = await _customVisionService.GetProjectWithImageAndPascalAnnotations(customVisionProject, id, iteration);
 
             return response;
         }
