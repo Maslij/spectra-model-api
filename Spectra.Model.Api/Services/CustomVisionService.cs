@@ -16,6 +16,7 @@ using System.Xml.Serialization;
 using System.Xml.Linq;
 using System.IO.Compression;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace Spectra.Model.Api.Services
 {
@@ -43,9 +44,12 @@ namespace Spectra.Model.Api.Services
 
         private readonly AzureStorageConfiguration _azureStorageConfig;
 
-        public CustomVisionService(IOptions<AzureStorageConfiguration> azureStorageConfig)
+        private readonly ILogger _logger;
+
+        public CustomVisionService(IOptions<AzureStorageConfiguration> azureStorageConfig, ILogger<CustomVisionService> logger)
         {
             _azureStorageConfig = azureStorageConfig.Value;
+            _logger = logger;
         }
 
         private static async Task UploadFile(CloudBlockBlob blob, string path)
@@ -179,6 +183,8 @@ namespace Spectra.Model.Api.Services
             var _zippedPath = $"{_path}/Zip";
             string _fileName = $"{projectId}.zip";
             //string _zipPath = $"{_path}/Images/{_fileName}";
+            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
+
 
             if (!Directory.Exists(_startPath))
                 Directory.CreateDirectory(_startPath);
@@ -186,6 +192,7 @@ namespace Spectra.Model.Api.Services
 
             foreach (Image image in projectWithImagesAndRegions)
             {
+                _logger.LogInformation($"[INFO] Extracting Regions from Image {count}/{projectWithImagesAndRegions.Count()}");
                 var _xmlFileName = $"{image.Id}.xml";
                 var _imageFileName = $"{image.Id}.jpg";
                 var _xmlPath = $"{_startPath}/{_xmlFileName}";
@@ -279,6 +286,7 @@ namespace Spectra.Model.Api.Services
                 count++;
             }
             // Finally, zip the directory.
+            _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
             string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
 
             // Upload the zip file to Azure
@@ -374,6 +382,7 @@ namespace Spectra.Model.Api.Services
             var _zippedPath = $"{_path}/Zip";
             string _fileName = $"{projectId}.zip";
             //string _zipPath = $"{_path}/Images/{_fileName}";
+            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
 
             if (!Directory.Exists(_startPath))
                 Directory.CreateDirectory(_startPath);
@@ -383,6 +392,7 @@ namespace Spectra.Model.Api.Services
 
             foreach (Image image in projectWithImagesAndRegions)
             {
+                _logger.LogInformation($"[INFO] Extracting Regions from Image {count}/{projectWithImagesAndRegions.Count()}");
                 var _jsonFileName = $"{image.Id}.json";
                 var _imageFileName = $"{image.Id}.jpg";
                 var _jsonPath = $"{_startPath}/{_jsonFileName}";
@@ -418,6 +428,7 @@ namespace Spectra.Model.Api.Services
             }
 
             // Finally, zip the directory.
+            _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
             string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
 
             // Upload the zip file to Azure
