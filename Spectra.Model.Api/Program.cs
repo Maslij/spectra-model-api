@@ -21,7 +21,10 @@ namespace Spectra.Model.Api
                 .ConfigureLogging(logging =>
                 {
                     logging.ClearProviders();
-                    logging.AddConsole();
+                    logging.AddConsole(c =>
+                    {
+                        c.TimestampFormat = "[dd-MM-yyyy HH:mm:ss] ";
+                    });
                 })
                 .ConfigureWebHostDefaults(webBuilder =>
                 {

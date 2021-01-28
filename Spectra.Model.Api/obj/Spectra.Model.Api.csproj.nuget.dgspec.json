@@ -52,6 +52,10 @@
               "target": "Package",
               "version": "[11.2.2, )"
             },
+            "MongoDB.Driver": {
+              "target": "Package",
+              "version": "[2.11.6, )"
+            },
             "WindowsAzure.Storage": {
               "target": "Package",
               "version": "[9.3.3, )"

@@ -17,6 +17,7 @@ using System.Xml.Linq;
 using System.IO.Compression;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 
 namespace Spectra.Model.Api.Services
 {
@@ -45,11 +46,15 @@ namespace Spectra.Model.Api.Services
         private readonly AzureStorageConfiguration _azureStorageConfig;
 
         private readonly ILogger _logger;
+        private IMongoDatabase _database;
 
-        public CustomVisionService(IOptions<AzureStorageConfiguration> azureStorageConfig, ILogger<CustomVisionService> logger)
+        public CustomVisionService(IOptions<AzureStorageConfiguration> azureStorageConfig, ISpectraDatabaseSettings settings, ILogger<CustomVisionService> logger)
         {
             _azureStorageConfig = azureStorageConfig.Value;
             _logger = logger;
+
+            var client = new MongoClient(settings.ConnectionString);
+            _database = client.GetDatabase(settings.DatabaseName);
         }
 
         private static async Task UploadFile(CloudBlockBlob blob, string path)
@@ -85,10 +90,40 @@ namespace Spectra.Model.Api.Services
             return predictionApi;
         }
 
-        public async Task<IList<Project>> GetProjects(CustomVisionProject project)
+        public async Task<IList<SpectraProjectWithMetadata>> GetProjects(CustomVisionProject project)
         {
             CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-            return await trainingApi.GetProjectsAsync();
+
+            var spectraProjectCollection = _database.GetCollection<SpectraProject>("spectra-projects");
+            var projectMetaData = spectraProjectCollection.Find(project => true).ToList();
+
+            // Get all the Custom Vision projects
+            var customVisionProjects = await trainingApi.GetProjectsAsync();
+
+            IList<SpectraProjectWithMetadata> spectraProjects = new List<SpectraProjectWithMetadata>();
+            IList<Project> metaDataMatches = new List<Project>();
+
+            List<SpectraProjectWithMetadata> mergedList =
+                projectMetaData.Join(
+                        customVisionProjects,
+                        x1 => x1.ProjectId,
+                        x2 => x2.Id,
+                        (x1, x2) => new SpectraProjectWithMetadata
+                        {
+                            Category = x1.Category,
+                            Created = x2.Created,
+                            Description = x2.Description,
+                            DrModeEnabled = x2.DrModeEnabled,
+                            Id = x2.Id,
+                            LastModified = x2.LastModified,
+                            Name = x2.Name,
+                            Settings = x2.Settings,
+                            Status = x2.Status,
+                            ThumbnailUri = x2.ThumbnailUri
+                        })
+                        .ToList();
+
+            return mergedList;
         }
 
         public async Task<Project> GetProject(CustomVisionProject project, Guid projectId)

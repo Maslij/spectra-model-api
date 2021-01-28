@@ -23,7 +23,7 @@ namespace Spectra.Model.Api.Controllers
 
         [Route("projects")]
         [HttpGet]
-        public async Task<IList<Project>> GetProjects(CustomVisionProject customVisionProject)
+        public async Task<IList<SpectraProjectWithMetadata>> GetProjects(CustomVisionProject customVisionProject)
         {
             return await _customVisionService.GetProjects(customVisionProject);
         }
