@@ -116,6 +116,7 @@ namespace Spectra.Model.Api.Services
                         (x1, x2) => new SpectraProjectWithMetadata
                         {
                             Category = x1.Category,
+                            DemoUrls = x1.DemoUrls,
                             Created = x2.Created,
                             Description = x2.Description,
                             DrModeEnabled = x2.DrModeEnabled,

@@ -11,6 +11,9 @@ namespace Spectra.Model.Api.Models
         [JsonProperty("category")]
         public string Category { get; set; }
 
+        [JsonProperty("demo_urls")]
+        public string[] DemoUrls { get; set; }
+
         [JsonProperty("created")]
         public DateTime Created { get; set; }
 
