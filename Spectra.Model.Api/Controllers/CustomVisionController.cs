@@ -46,6 +46,15 @@ namespace Spectra.Model.Api.Controllers
             return response;
         }
 
+        [Route("project/{id}/images/yolo/{iteration}")]
+        [HttpGet]
+        public async Task<object> GetProjectWithImageAndYoloAnnotations(CustomVisionProject customVisionProject, Guid id, Guid iteration)
+        {
+            var response = await _customVisionService.GetProjectWithImageAndYoloAnnotations(customVisionProject, id, iteration);
+
+            return response;
+        }
+
         [Route("project/{id}/images/upload")]
         [HttpPost]
         public async Task<object> UploadImageToAzure(CustomVisionBatchImage customVisionBatchImage, Guid id)

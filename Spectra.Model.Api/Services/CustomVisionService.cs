@@ -44,6 +44,9 @@ namespace Spectra.Model.Api.Services
     {
 
         private readonly AzureStorageConfiguration _azureStorageConfig;
+        private CustomVisionTrainingClient trainingApi;
+        private CloudBlobContainer cloudBlobContainer;
+        private CloudBlobClient blobClient;
 
         private readonly ILogger _logger;
         private IMongoDatabase _database;
@@ -176,13 +179,9 @@ namespace Spectra.Model.Api.Services
 
         }
 
-        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId)
+        private async Task<CloudBlobContainer> FindOrCreateBlob(CloudBlobClient blobClient, Guid projectId)
         {
-            CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-            CloudBlobClient blobClient = InitiateBlobClient();
-
-            string containerReference = $"{projectId}";
-            CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference(containerReference);
+            CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference(projectId.ToString());
 
             // Create the container if it doesn't exist
             if (!cloudBlobContainer.Exists())
@@ -192,9 +191,12 @@ namespace Spectra.Model.Api.Services
                 containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
                 cloudBlobContainer.SetPermissions(containerPermissions);
             }
-            var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
-            var currentProject = await trainingApi.GetProjectAsync(projectId);
+            return cloudBlobContainer;
+        }
 
+        private async Task<IList<Image>> GetProjectWithImagesAndRegions(Guid projectId, Guid iterationId)
+        {
+            var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
             IList<Image> projectWithImagesAndRegions = new List<Image>();
 
             for (int i = 0; i < imageCount; i = i + 100)
@@ -202,37 +204,34 @@ namespace Spectra.Model.Api.Services
                 var diff = Math.Abs((decimal)(i - imageCount));
                 if (diff < 100)
                 {
-                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
+                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetTaggedImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
                     projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(smallSplitProjectWithImagesAndRegions).ToList();
                 }
                 else
                 {
-                    var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
+                    var splitProjectWithImagesAndRegions = await trainingApi.GetTaggedImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
                     projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
                 }
             }
 
-            int count = 0;
+            return projectWithImagesAndRegions;
+        }
+
+        public async Task<bool> ExtractRegionsFromCustomVisionImage(IList<Image> projectWithImagesAndRegions, Guid projectId, string convertTo)
+        {
+            // File metadata
             var _path = Path.GetTempPath();
             var _startPath = $"{_path}/Images";
             var _zippedPath = $"{_path}/Zip";
             string _fileName = $"{projectId}.zip";
-            //string _zipPath = $"{_path}/Images/{_fileName}";
-            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
 
-
-            if (!Directory.Exists(_startPath))
-                Directory.CreateDirectory(_startPath);
-            Dictionary<string, object> _blobDirectory = new Dictionary<string, object>();
-
+            // Set a counter for logging purposes
+            int count = 0;
             foreach (Image image in projectWithImagesAndRegions)
             {
                 _logger.LogInformation($"[INFO] Extracting Regions from Image {count}/{projectWithImagesAndRegions.Count()}");
-                var _xmlFileName = $"{image.Id}.xml";
                 var _imageFileName = $"{image.Id}.jpg";
-                var _xmlPath = $"{_startPath}/{_xmlFileName}";
                 var _imagePath = $"{_startPath}/{_imageFileName}";
-
 
                 // Download the Image URL
                 using (WebClient wc = new WebClient())
@@ -241,51 +240,117 @@ namespace Spectra.Model.Api.Services
                 }
                 CloudBlockBlob cloudBlockBlobImage = cloudBlobContainer.GetBlockBlobReference(_imageFileName);
 
-                // Check if the file already exits in the blob
-                bool imageUrl = DoesFileExist(_imageFileName, blobClient, containerReference);
+                // Check if the file already exits in the blob, if it doesn't, upload it.
+                bool imageUrl = DoesFileExist(_imageFileName, blobClient, projectId.ToString());
                 if (!imageUrl)
                     await cloudBlockBlobImage.UploadFromFileAsync(_imagePath);
 
-                List<Models.Pascal.Object> imageObjects = new List<Models.Pascal.Object>();
+                bool didImageFileUpload = await UploadBlob($"{image.Id}.jpg", _startPath, projectId);
 
-                if(image.Regions != null)
+                switch (convertTo)
                 {
-                    foreach (ImageRegion region in image.Regions)
-                    {
-                        BoundBox newBounds = new BoundBox
-                        {
-                            Xmin = region.Left * region.Width,
-                            Ymin = region.Top * region.Height,
-                            Xmax = region.Width * region.Width,
-                            Ymax = region.Height * region.Height
-                        };
-                        imageObjects.Add(new Models.Pascal.Object
-                        {
-                            Name = region.TagName,
-                            Bndbox = newBounds
-                        });
-                    }
+                    case "Pascal":
+                        Annotation pascalAnnotationObject = ConvertAnnotationsToPascal(image);
+                        bool didCreatePascalFile = CreatePascalAnnotationFile(pascalAnnotationObject, $"{_startPath}/{image.Id}.xml");
+                        bool didPascalFileUpload = await UploadBlob($"{image.Id}.xml", _startPath, projectId);
+                        break;
+                    case "Custom Vision":
+                        break;
+                    case "Yolo":
+                        List<string> yoloAnnotationList = ConvertAnnotationsToYolo(image);
+                        bool didCreateYoloFile = CreateYoloAnnotationFile(yoloAnnotationList, $"{_startPath}/{image.Id}.txt");
+                        bool didYoloFileUpload = await UploadBlob($"{image.Id}.txt", _startPath, projectId);
+                        break;
                 }
+                count++;
+            }
 
-                // Create the Pascal Annotation
-                var pascalAnnotationFile = new Annotation
+            return true;
+        }
+
+        private List<string> ConvertAnnotationsToYolo(Image image)
+        {
+            var _txtFileName = $"{image.Id}.txt";
+            List<string> imageObjects = new List<string>();
+
+            if (image.Regions != null)
+            {
+                foreach (ImageRegion region in image.Regions)
+                {
+                    double x_centre = region.Left + (region.Width / 2);
+                    double y_centre = region.Top + (region.Height / 2);
+                    double x_width = region.Width;
+                    double y_height = region.Height;
+
+                    imageObjects.Add($"{region.TagId} {x_centre} {y_centre} {x_width} {y_height}");
+                }
+            }
+
+            return imageObjects;
+
+        }
+
+            private Annotation ConvertAnnotationsToPascal(Image image)
+        {
+            List<Models.Pascal.Object> imageObjects = new List<Models.Pascal.Object>();
+            var _xmlFileName = $"{image.Id}.xml";
+
+            if (image.Regions != null)
+            {
+                foreach (ImageRegion region in image.Regions)
                 {
 
-                    Folder = "",
-                    FileName = _xmlFileName,
-                    Source = new Source { Database = "" },
-                    Size = new Size
+                    BoundBox newBounds = new BoundBox
                     {
-                        Depth = 3,
-                        Width = image.Width,
-                        Height = image.Height,
-                    },
-                    Objects = imageObjects
-                };
+                        Xmin = region.Left * region.Width,
+                        Ymin = region.Top * region.Height,
+                        Xmax = region.Width * region.Width,
+                        Ymax = region.Height * region.Height
+                    };
+                    imageObjects.Add(new Models.Pascal.Object
+                    {
+                        Name = region.TagName,
+                        Bndbox = newBounds
+                    });
+                }
+            }
 
-                // Create the PASCAL VOC Annotation file
+            // Create the Pascal Annotation
+            var pascalAnnotationFile = new Annotation
+            {
 
+                Folder = "",
+                FileName = _xmlFileName,
+                Source = new Source { Database = "" },
+                Size = new Size
+                {
+                    Depth = 3,
+                    Width = image.Width,
+                    Height = image.Height,
+                },
+                Objects = imageObjects
+            };
+
+            return pascalAnnotationFile;
+        }
+
+        private bool CreateYoloAnnotationFile(List<string> yoloAnnotationList, string _txtPath)
+        {
+            using (StreamWriter file =
+                new StreamWriter(_txtPath))
+            {
+                foreach (string line in yoloAnnotationList)
+                    file.WriteLine(line);
+            }
+            return true;
+        }
+
+        private bool CreatePascalAnnotationFile(Annotation pascalAnnotationFile, string startPath)
+        {
+            try
+            {
                 XmlSerializer x = new System.Xml.Serialization.XmlSerializer(pascalAnnotationFile.GetType());
+                var _xmlPath = $"{startPath}/{pascalAnnotationFile.FileName}";
 
                 using Stream writer = new FileStream(_xmlPath, FileMode.OpenOrCreate);
                 {
@@ -305,21 +370,64 @@ namespace Spectra.Model.Api.Services
                     xmlDoc.Save(newWriter);
                     newWriter.Close();
                 }
-
-                CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(_xmlFileName);
-                await cloudBlockBlob.UploadFromFileAsync(_xmlPath);
-                Uri jsonUrl = GetBlobUrl(_xmlFileName, blobClient, containerReference);
-
-                var imageLinks = new
-                {
-                    image_uri = cloudBlockBlobImage.Uri,
-                    annotations_uri = cloudBlockBlob.Uri
-                };
-
-                _blobDirectory.Add($"image_{count}", imageLinks);
-
-                count++;
+                return true;
             }
+            catch(Exception e)
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> UploadBlob(string fileName, string filePath, Guid projectId)
+        {
+            CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(fileName);
+            await cloudBlockBlob.UploadFromFileAsync($"{filePath}/{fileName}");
+
+            return true;
+        }
+
+        public async Task<object> GetProjectWithImageAndYoloAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId)
+        {
+            string convertTo = "Yolo";
+
+            // Set the training API
+            trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
+
+            // Set the blob client
+            blobClient = InitiateBlobClient();
+
+            // Set the container if it doesn't exist
+            cloudBlobContainer = await FindOrCreateBlob(blobClient, projectId);
+
+            // Get the current Project
+            var currentProject = await trainingApi.GetProjectAsync(projectId);
+
+            // Get the images and regions of the current project and iteration
+            IList<Image> projectWithImagesAndRegions = await GetProjectWithImagesAndRegions(projectId, iterationId);
+
+            // Set the file metadata
+            var _path = Path.GetTempPath();
+            var _startPath = $"{_path}/Images";
+            var _zippedPath = $"{_path}/Zip";
+            string _fileName = $"{projectId}.zip";
+
+            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
+
+            // Create the Temp directory if it doesn't exist
+            if (!Directory.Exists(_startPath))
+                Directory.CreateDirectory(_startPath);
+
+            // Extract the Custom Vision regions from each individual image.
+            try
+            {
+                bool successfullExtraction = await ExtractRegionsFromCustomVisionImage(projectWithImagesAndRegions, projectId, convertTo);
+            }
+            catch (Exception e)
+            {
+
+            }
+
+
             // Finally, zip the directory.
             _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
             string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
@@ -336,11 +444,82 @@ namespace Spectra.Model.Api.Services
             foreach (FileInfo file in dInfo.GetFiles())
                 file.Delete();
 
+            // Generate Response
             var response = new
             {
                 project_id = projectId,
                 project_name = currentProject.Name,
-                image_count = count,
+                image_count = projectWithImagesAndRegions.Count(),
+                zipped_project = zippedFileUri
+            };
+
+
+            return response;
+        }
+
+        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId)
+        {
+            string convertTo = "Pascal";
+            // Set the training API
+            trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
+            
+            // Set the blob client
+            blobClient = InitiateBlobClient();
+
+            // Set the container if it doesn't exist
+            cloudBlobContainer = await FindOrCreateBlob(blobClient, projectId);
+
+            // Get the current Project
+            var currentProject = await trainingApi.GetProjectAsync(projectId);
+
+            // Get the images and regions of the current project and iteration
+            IList<Image> projectWithImagesAndRegions = await GetProjectWithImagesAndRegions(projectId, iterationId);
+
+            // Set the file metadata
+            var _path = Path.GetTempPath();
+            var _startPath = $"{_path}/Images";
+            var _zippedPath = $"{_path}/Zip";
+            string _fileName = $"{projectId}.zip";
+
+            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
+
+            // Create the Temp directory if it doesn't exist
+            if (!Directory.Exists(_startPath))
+                Directory.CreateDirectory(_startPath);
+
+            // Extract the Custom Vision regions from each individual image.
+            try
+            {
+                bool successfullExtraction = await ExtractRegionsFromCustomVisionImage(projectWithImagesAndRegions, projectId, convertTo);
+            }
+            catch (Exception e)
+            {
+
+            }
+
+
+            // Finally, zip the directory.
+            _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
+            string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
+
+            // Upload the zip file to Azure
+            Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
+
+            // Clean-up
+            DirectoryInfo dInfo = new DirectoryInfo(_startPath);
+            foreach (FileInfo file in dInfo.GetFiles())
+                file.Delete();
+
+            dInfo = new DirectoryInfo(_zippedPath);
+            foreach (FileInfo file in dInfo.GetFiles())
+                file.Delete();
+
+            // Generate Response
+            var response = new
+            {
+                project_id = projectId,
+                project_name = currentProject.Name,
+                image_count = projectWithImagesAndRegions.Count(),
                 zipped_project = zippedFileUri
             };
 
@@ -399,12 +578,12 @@ namespace Spectra.Model.Api.Services
                 var diff = Math.Abs((decimal)(i - imageCount));
                 if (diff < 100)
                 {
-                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
+                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetTaggedImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
                     projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(smallSplitProjectWithImagesAndRegions).ToList();
                 }
                 else
                 {
-                    var splitProjectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
+                    var splitProjectWithImagesAndRegions = await trainingApi.GetTaggedImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
                     projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
                 }
             }
@@ -487,25 +666,6 @@ namespace Spectra.Model.Api.Services
             };
 
             return response;
-            /*using (FileStream zipToOpen = new FileStream(_zipPath, FileMode.Create))
-            using (ZipArchive archive = new ZipArchive(zipToOpen, ZipArchiveMode.Create))
-            {
-                foreach (var file in Directory.GetFiles(_startPath))
-                {
-                    var entryName = Path.GetFileName(file);
-                    var entry = archive.CreateEntry(entryName);
-                    using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (var stream = entry.Open())
-                    {
-                        fs.CopyTo(stream, 81920);
-                    }
-                }
-            }
-
-            byte[] fileBytes = System.IO.File.ReadAllBytes(_zipPath);
-
-            return fileBytes;
-            */
         }
     }
 }
