@@ -32,7 +32,8 @@ namespace Spectra.Model.Api.Controllers
         [HttpGet]
         public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject customVisionProject, Guid id, Guid iteration)
         {
-            var response = await _customVisionService.GetProjectWithImagesAndRegions(customVisionProject, id, iteration);
+            //var response = await _customVisionService.GetProjectWithImagesAndRegions(customVisionProject, id, iteration);
+            var response = await _customVisionService.GetProjectWithImageAndAnnotations(customVisionProject, id, iteration, "customvision");
 
             return response;
         }
@@ -41,7 +42,7 @@ namespace Spectra.Model.Api.Controllers
         [HttpGet]
         public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject customVisionProject, Guid id, Guid iteration)
         {
-            var response = await _customVisionService.GetProjectWithImageAndPascalAnnotations(customVisionProject, id, iteration);
+            var response = await _customVisionService.GetProjectWithImageAndAnnotations(customVisionProject, id, iteration, "pascal");
 
             return response;
         }
@@ -50,7 +51,7 @@ namespace Spectra.Model.Api.Controllers
         [HttpGet]
         public async Task<object> GetProjectWithImageAndYoloAnnotations(CustomVisionProject customVisionProject, Guid id, Guid iteration)
         {
-            var response = await _customVisionService.GetProjectWithImageAndYoloAnnotations(customVisionProject, id, iteration);
+            var response = await _customVisionService.GetProjectWithImageAndAnnotations(customVisionProject, id, iteration, "yolo");
 
             return response;
         }

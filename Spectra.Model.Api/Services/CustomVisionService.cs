@@ -18,6 +18,8 @@ using System.IO.Compression;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using Spectra.Model.Api.Helpers;
+using System.Threading;
 
 namespace Spectra.Model.Api.Services
 {
@@ -231,32 +233,49 @@ namespace Spectra.Model.Api.Services
                 var _imageFileName = $"{image.Id}.jpg";
                 var _imagePath = $"{_startPath}/{_imageFileName}";
 
+                _logger.LogInformation($"[INFO] Downloading File");
                 // Download the Image URL
-                using (WebClient wc = new WebClient())
+                /*using (WebClient wc = new WebClient())
                 {
                     wc.DownloadFile(image.OriginalImageUri, _imagePath);
-                }
+                }*/
+
+                Downloader BlobDownloader = new Downloader();
+
+                BlobDownloader.DownloadFile(image.OriginalImageUri, _imagePath);
+
+                while (!BlobDownloader.DownloadCompleted)
+                    Thread.Sleep(1000);
+
                 CloudBlockBlob cloudBlockBlobImage = cloudBlobContainer.GetBlockBlobReference(_imageFileName);
 
+                _logger.LogInformation($"[INFO] Checking if the Image file exists.");
                 // Check if the file already exits in the blob, if it doesn't, upload it.
                 bool imageUrl = DoesFileExist(_imageFileName, blobClient, projectId.ToString());
                 if (!imageUrl)
                     await cloudBlockBlobImage.UploadFromFileAsync(_imagePath);
 
-                bool didImageFileUpload = await UploadBlob($"{image.Id}.jpg", _startPath, projectId);
+                //bool didImageFileUpload = await UploadBlob($"{image.Id}.jpg", _startPath, projectId);
 
+                string fileExtension = "";
                 switch (convertTo)
                 {
-                    case "Pascal":
+                    case "pascal":
+                        fileExtension = ".xml";
                         Annotation pascalAnnotationObject = ConvertAnnotationsToPascal(image);
-                        bool didCreatePascalFile = CreatePascalAnnotationFile(pascalAnnotationObject, $"{_startPath}/{image.Id}.xml");
+                        bool didCreatePascalFile = CreatePascalAnnotationFile(pascalAnnotationObject, $"{_startPath}/{image.Id}{fileExtension}");
                         bool didPascalFileUpload = await UploadBlob($"{image.Id}.xml", _startPath, projectId);
                         break;
-                    case "Custom Vision":
+                    case "customvision":
+                        fileExtension = ".json";
+                        // No need to convert the annotations.
+                        bool didCreateCustomVisionFile = await CreateCustomVisionAnnotationFile(image, $"{_startPath}/{image.Id}{fileExtension}");
+                        bool didCustomVisionFileUpload = await UploadBlob($"{image.Id}.json", _startPath, projectId);
                         break;
-                    case "Yolo":
+                    case "yolo":
+                        fileExtension = ".txt";
                         List<string> yoloAnnotationList = ConvertAnnotationsToYolo(image);
-                        bool didCreateYoloFile = CreateYoloAnnotationFile(yoloAnnotationList, $"{_startPath}/{image.Id}.txt");
+                        bool didCreateYoloFile = CreateYoloAnnotationFile(yoloAnnotationList, $"{_startPath}/{image.Id}{fileExtension}");
                         bool didYoloFileUpload = await UploadBlob($"{image.Id}.txt", _startPath, projectId);
                         break;
                 }
@@ -332,6 +351,17 @@ namespace Spectra.Model.Api.Services
             return pascalAnnotationFile;
         }
 
+        private async Task<bool> CreateCustomVisionAnnotationFile(Image image, string _jsonPath)
+        {
+            // Create the JSON Annotation file
+            using Stream writer = new FileStream(_jsonPath, FileMode.OpenOrCreate);
+            {
+                await JsonSerializer.SerializeAsync(writer, image);
+                writer.Close();
+            }
+            return true;
+        }
+
         private bool CreateYoloAnnotationFile(List<string> yoloAnnotationList, string _txtPath)
         {
             using (StreamWriter file =
@@ -383,150 +413,94 @@ namespace Spectra.Model.Api.Services
             return true;
         }
 
-        public async Task<object> GetProjectWithImageAndYoloAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId)
+        public async Task<object> GetProjectWithImageAndAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId, string convertTo)
         {
-            string convertTo = "Yolo";
-
-            // Set the training API
-            trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-
-            // Set the blob client
-            blobClient = InitiateBlobClient();
-
-            // Set the container if it doesn't exist
-            cloudBlobContainer = await FindOrCreateBlob(blobClient, projectId);
-
-            // Get the current Project
-            var currentProject = await trainingApi.GetProjectAsync(projectId);
-
-            // Get the images and regions of the current project and iteration
-            IList<Image> projectWithImagesAndRegions = await GetProjectWithImagesAndRegions(projectId, iterationId);
-
-            // Set the file metadata
-            var _path = Path.GetTempPath();
-            var _startPath = $"{_path}/Images";
-            var _zippedPath = $"{_path}/Zip";
-            string _fileName = $"{projectId}.zip";
-
-            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
-
-            // Create the Temp directory if it doesn't exist
-            if (!Directory.Exists(_startPath))
-                Directory.CreateDirectory(_startPath);
-
-            // Extract the Custom Vision regions from each individual image.
             try
             {
+                // Set the training API
+                trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
+
+                // Set the blob client
+                blobClient = InitiateBlobClient();
+
+                // Set the container if it doesn't exist
+                cloudBlobContainer = await FindOrCreateBlob(blobClient, projectId);
+
+                // Get the current Project
+                var currentProject = await trainingApi.GetProjectAsync(projectId);
+
+                // Get the images and regions of the current project and iteration
+                IList<Image> projectWithImagesAndRegions = await GetProjectWithImagesAndRegions(projectId, iterationId);
+
+                // Set the file metadata
+                var _path = Path.GetTempPath();
+                var _startPath = $"{_path}/Images";
+                var _zippedPath = $"{_path}/Zip";
+                string _fileName = $"{projectId}-{iterationId}-{convertTo}.zip";
+
+                // Does the Zip file already exist?
+                bool zipUrl = DoesFileExist(_fileName, blobClient, projectId.ToString());
+                if (zipUrl)
+                {
+                    CloudBlockBlob cloudZipBlob = cloudBlobContainer.GetBlockBlobReference(_fileName);
+                    return new
+                    {
+                        project_id = projectId,
+                        project_name = currentProject.Name,
+                        image_count = projectWithImagesAndRegions.Count(),
+                        zipped_project = cloudZipBlob.Uri
+                    };
+                }
+
+                _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
+
+                // Create the Temp directory if it doesn't exist
+                if (!Directory.Exists(_startPath))
+                    Directory.CreateDirectory(_startPath);
+
+                // Extract the Custom Vision regions from each individual image.
                 bool successfullExtraction = await ExtractRegionsFromCustomVisionImage(projectWithImagesAndRegions, projectId, convertTo);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"[INFO]  {e.Message}");
-            }
+            
 
 
-            // Finally, zip the directory.
-            _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
-            string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
+                // Finally, zip the directory.
+                _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
+                string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
 
-            // Upload the zip file to Azure
-            Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
+                // Upload the zip file to Azure
+                Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
 
-            // Clean-up
-            DirectoryInfo dInfo = new DirectoryInfo(_startPath);
-            foreach (FileInfo file in dInfo.GetFiles())
-                file.Delete();
+                // Clean-up
+                DirectoryInfo dInfo = new DirectoryInfo(_startPath);
+                foreach (FileInfo file in dInfo.GetFiles())
+                    file.Delete();
 
-            dInfo = new DirectoryInfo(_zippedPath);
-            foreach (FileInfo file in dInfo.GetFiles())
-                file.Delete();
+                dInfo = new DirectoryInfo(_zippedPath);
+                foreach (FileInfo file in dInfo.GetFiles())
+                    file.Delete();
 
-            // Generate Response
-            var response = new
-            {
-                project_id = projectId,
-                project_name = currentProject.Name,
-                image_count = projectWithImagesAndRegions.Count(),
-                zipped_project = zippedFileUri
-            };
+                // Generate Response
+                var response = new
+                {
+                    project_id = projectId,
+                    project_name = currentProject.Name,
+                    image_count = projectWithImagesAndRegions.Count(),
+                    zipped_project = zippedFileUri
+                };
 
 
-            return response;
-        }
-
-        public async Task<object> GetProjectWithImageAndPascalAnnotations(CustomVisionProject project, Guid projectId, Guid iterationId)
-        {
-            string convertTo = "Pascal";
-            // Set the training API
-            _logger.LogInformation($"[INFO] Setting Training API");
-            trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-
-            // Set the blob client
-            _logger.LogInformation($"[INFO] Setting Blob client");
-            blobClient = InitiateBlobClient();
-
-            // Set the container if it doesn't exist
-            _logger.LogInformation($"[INFO] Setting Blob container");
-            cloudBlobContainer = await FindOrCreateBlob(blobClient, projectId);
-
-            // Get the current Project
-            var currentProject = await trainingApi.GetProjectAsync(projectId);
-
-            // Get the images and regions of the current project and iteration
-            IList<Image> projectWithImagesAndRegions = await GetProjectWithImagesAndRegions(projectId, iterationId);
-
-            // Set the file metadata
-            var _path = Path.GetTempPath();
-            var _startPath = $"{_path}/Images";
-            var _zippedPath = $"{_path}/Zip";
-            string _fileName = $"{projectId}.zip";
-
-            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
-
-            // Create the Temp directory if it doesn't exist
-            if (!Directory.Exists(_startPath))
-                Directory.CreateDirectory(_startPath);
-
-            // Extract the Custom Vision regions from each individual image.
-            try
-            {
-                _logger.LogInformation($"[INFO] Starting Region Extraction");
-                bool successfullExtraction = await ExtractRegionsFromCustomVisionImage(projectWithImagesAndRegions, projectId, convertTo);
+                return response;
             }
             catch (Exception e)
             {
                 _logger.LogError($"[ERROR]  {e.Message}");
+                return new
+                {
+                    error = e.Message
+                };
             }
-
-
-            // Finally, zip the directory.
-            _logger.LogInformation($"[INFO] Zipping Project to {_zippedPath}");
-            string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
-
-            // Upload the zip file to Azure
-            Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
-
-            // Clean-up
-            DirectoryInfo dInfo = new DirectoryInfo(_startPath);
-            foreach (FileInfo file in dInfo.GetFiles())
-                file.Delete();
-
-            dInfo = new DirectoryInfo(_zippedPath);
-            foreach (FileInfo file in dInfo.GetFiles())
-                file.Delete();
-
-            // Generate Response
-            var response = new
-            {
-                project_id = projectId,
-                project_name = currentProject.Name,
-                image_count = projectWithImagesAndRegions.Count(),
-                zipped_project = zippedFileUri
-            };
-
-
-            return response;
         }
+
         public async Task<Uri> UploadBlobToAzure(CloudBlobContainer cloudBlobContainer, string filePath, string fileName)
         {
             CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(fileName);
@@ -554,119 +528,6 @@ namespace Spectra.Model.Api.Services
             //byte[] fileBytes = System.IO.File.ReadAllBytes(_zipPath);
 
             return zipPath;
-        }
-
-        public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject project, Guid projectId, Guid iterationId)
-        {
-            CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-            CloudBlobClient blobClient = InitiateBlobClient();
-            CloudBlobContainer cloudBlobContainer = blobClient.GetContainerReference($"{projectId}");
-
-            // Create the container if it doesn't exist
-            if (!cloudBlobContainer.Exists())
-            {
-                await cloudBlobContainer.CreateAsync();
-                var containerPermissions = new BlobContainerPermissions();
-                containerPermissions.PublicAccess = BlobContainerPublicAccessType.Blob;
-                cloudBlobContainer.SetPermissions(containerPermissions);
-            }
-            var imageCount = await trainingApi.GetTaggedImageCountAsync(projectId, iterationId);
-            var currentProject = await trainingApi.GetProjectAsync(projectId);
-
-            IList<Image> projectWithImagesAndRegions = new List<Image>();
-            for (int i=0; i < imageCount; i=i+100)
-            {
-                var diff = Math.Abs((decimal)(i - imageCount));
-                if (diff < 100)
-                {
-                    var smallSplitProjectWithImagesAndRegions = await trainingApi.GetTaggedImagesAsync(projectId, iterationId: iterationId, take: (int?)diff, skip: i);
-                    projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(smallSplitProjectWithImagesAndRegions).ToList();
-                }
-                else
-                {
-                    var splitProjectWithImagesAndRegions = await trainingApi.GetTaggedImagesAsync(projectId, iterationId: iterationId, take: 100, skip: i);
-                    projectWithImagesAndRegions = projectWithImagesAndRegions.Concat(splitProjectWithImagesAndRegions).ToList();
-                }
-            }
-            
-            //var projectWithImagesAndRegions = await trainingApi.GetImagesAsync(projectId, iterationId: iterationId, take: imageCount);
-
-            int count = 0;
-            var _path = Path.GetTempPath();
-            var _startPath = $"{_path}/Images";
-            var _zippedPath = $"{_path}/Zip";
-            string _fileName = $"{projectId}.zip";
-            //string _zipPath = $"{_path}/Images/{_fileName}";
-            _logger.LogInformation($"[INFO] Creating Temp Directory at {_startPath}");
-
-            if (!Directory.Exists(_startPath))
-                Directory.CreateDirectory(_startPath);
-            if (!Directory.Exists(_zippedPath))
-                Directory.CreateDirectory(_zippedPath);
-            Dictionary<string, object> _blobDirectory = new Dictionary<string, object>();
-
-            foreach (Image image in projectWithImagesAndRegions)
-            {
-                _logger.LogInformation($"[INFO] Extracting Regions from Image {count}/{projectWithImagesAndRegions.Count()}");
-                var _jsonFileName = $"{image.Id}.json";
-                var _imageFileName = $"{image.Id}.jpg";
-                var _jsonPath = $"{_startPath}/{_jsonFileName}";
-                var _imagePath = $"{_startPath}/{_imageFileName}";
-
-
-                // Download the Image URL
-                using (WebClient wc = new WebClient())
-                {
-                    wc.DownloadFile(image.OriginalImageUri, _imagePath);
-                }
-                CloudBlockBlob cloudBlockBlobImage = cloudBlobContainer.GetBlockBlobReference(_imageFileName);
-                await cloudBlockBlobImage.UploadFromFileAsync(_imagePath);
-
-                // Create the JSON Annotation file
-                using Stream writer = new FileStream(_jsonPath, FileMode.OpenOrCreate);
-                {
-                    await JsonSerializer.SerializeAsync(writer, image);
-                    writer.Close();
-                }
-                CloudBlockBlob cloudBlockBlob = cloudBlobContainer.GetBlockBlobReference(_jsonFileName);
-                await cloudBlockBlob.UploadFromFileAsync(_jsonPath);
-
-                var imageLinks = new
-                {
-                    image_uri = cloudBlockBlobImage.Uri,
-                    annotations_uri = cloudBlockBlob.Uri
-                };
-
-                _blobDirectory.Add($"image_{count}", imageLinks);
-
-                count++;
-            }
-
-            // Finally, zip the directory.
-            _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
-            string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
-
-            // Upload the zip file to Azure
-            Uri zippedFileUri = await UploadBlobToAzure(cloudBlobContainer, zippedPath, _fileName);
-
-            // Clean-up
-            DirectoryInfo dInfo = new DirectoryInfo(_startPath);
-            foreach (FileInfo file in dInfo.GetFiles())
-                file.Delete();
-
-            dInfo = new DirectoryInfo(_zippedPath);
-            foreach (FileInfo file in dInfo.GetFiles())
-                file.Delete();
-
-            var response = new
-            {
-                project_id = projectId,
-                project_name = currentProject.Name,
-                image_count = count,
-                zipped_project = zippedFileUri
-            };
-
-            return response;
         }
     }
 }
