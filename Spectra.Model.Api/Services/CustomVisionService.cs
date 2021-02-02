@@ -356,7 +356,7 @@ namespace Spectra.Model.Api.Services
                 }
 
                 // Fix the formatting
-                XElement xmlDoc = XElement.Load(_xmlPath);
+                /*XElement xmlDoc = XElement.Load(_xmlPath);
                 XElement nodeToRemove = xmlDoc.Element("Objects");
                 var childNodes = nodeToRemove.Elements();
                 nodeToRemove.Remove();
@@ -366,7 +366,7 @@ namespace Spectra.Model.Api.Services
                 {
                     xmlDoc.Save(newWriter);
                     newWriter.Close();
-                }
+                }*/
                 return true;
             }
             catch(Exception e)
@@ -500,7 +500,7 @@ namespace Spectra.Model.Api.Services
 
 
             // Finally, zip the directory.
-            _logger.LogInformation($"[INFO] Zipping Project to {_startPath}{_zippedPath}");
+            _logger.LogInformation($"[INFO] Zipping Project to {_zippedPath}");
             string zippedPath = ZipAndUploadDirectory(_startPath, $"{_zippedPath}/{_fileName}");
 
             // Upload the zip file to Azure
