@@ -343,12 +343,11 @@ namespace Spectra.Model.Api.Services
             return true;
         }
 
-        private bool CreatePascalAnnotationFile(Annotation pascalAnnotationFile, string startPath)
+        private bool CreatePascalAnnotationFile(Annotation pascalAnnotationFile, string _xmlPath)
         {
             try
             {
                 XmlSerializer x = new System.Xml.Serialization.XmlSerializer(pascalAnnotationFile.GetType());
-                var _xmlPath = $"{startPath}/{pascalAnnotationFile.FileName}";
 
                 using Stream writer = new FileStream(_xmlPath, FileMode.OpenOrCreate);
                 {
