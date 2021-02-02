@@ -424,7 +424,7 @@ namespace Spectra.Model.Api.Services
             }
             catch (Exception e)
             {
-
+                _logger.LogError($"[INFO]  {e.Message}");
             }
 
 
@@ -494,7 +494,7 @@ namespace Spectra.Model.Api.Services
             }
             catch (Exception e)
             {
-
+                _logger.LogError($"[INFO]  {e.Message}");
             }
 
 
