@@ -222,8 +222,6 @@ namespace Spectra.Model.Api.Services
             // File metadata
             var _path = Path.GetTempPath();
             var _startPath = $"{_path}/Images";
-            var _zippedPath = $"{_path}/Zip";
-            string _fileName = $"{projectId}.zip";
 
             // Set a counter for logging purposes
             int count = 0;
@@ -461,12 +459,15 @@ namespace Spectra.Model.Api.Services
         {
             string convertTo = "Pascal";
             // Set the training API
+            _logger.LogInformation($"[INFO] Setting Training API");
             trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-            
+
             // Set the blob client
+            _logger.LogInformation($"[INFO] Setting Blob client");
             blobClient = InitiateBlobClient();
 
             // Set the container if it doesn't exist
+            _logger.LogInformation($"[INFO] Setting Blob container");
             cloudBlobContainer = await FindOrCreateBlob(blobClient, projectId);
 
             // Get the current Project
@@ -490,11 +491,12 @@ namespace Spectra.Model.Api.Services
             // Extract the Custom Vision regions from each individual image.
             try
             {
+                _logger.LogInformation($"[INFO] Starting Region Extraction");
                 bool successfullExtraction = await ExtractRegionsFromCustomVisionImage(projectWithImagesAndRegions, projectId, convertTo);
             }
             catch (Exception e)
             {
-                _logger.LogError($"[INFO]  {e.Message}");
+                _logger.LogError($"[ERROR]  {e.Message}");
             }
 
 
