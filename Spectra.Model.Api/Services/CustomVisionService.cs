@@ -21,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Spectra.Model.Api.Helpers;
 using System.Threading;
+using System.Web;
 
 namespace Spectra.Model.Api.Services
 {
@@ -557,8 +558,10 @@ namespace Spectra.Model.Api.Services
 
         public async Task<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImagePrediction> DemoPredictFromUrl(CustomVisionProject project, string projectId, string Url, string publishedName)
         {
+            // Decode the URL
+            var decodedUrl = HttpUtility.UrlDecode(Url);
             CustomVisionPredictionClient predictionApi = AuthenticatePrediction(project.Endpoint, project.PredictionKey);
-            Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(Url);
+            Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(decodedUrl);
             var predictionResult = await predictionApi.DetectImageUrlAsync(Guid.Parse(projectId), publishedName, predictionUrl);
 
             return predictionResult;
