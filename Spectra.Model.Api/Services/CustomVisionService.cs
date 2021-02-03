@@ -556,12 +556,10 @@ namespace Spectra.Model.Api.Services
             return zipPath;
         }
 
-        public async Task<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImagePrediction> DemoPredictFromUrl(CustomVisionProject project, string projectId, string Url, string publishedName)
+        public async Task<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImagePrediction> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
         {
-            // Decode the URL
-            var decodedUrl = HttpUtility.UrlDecode(Url);
-            CustomVisionPredictionClient predictionApi = AuthenticatePrediction(project.Endpoint, project.PredictionKey);
-            Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(decodedUrl);
+            CustomVisionPredictionClient predictionApi = AuthenticatePrediction(customVisionPrediction.Endpoint, customVisionPrediction.PredictionKey);
+            Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(customVisionPrediction.ImageUrl);
             var predictionResult = await predictionApi.DetectImageUrlAsync(Guid.Parse(projectId), publishedName, predictionUrl);
 
             return predictionResult;
