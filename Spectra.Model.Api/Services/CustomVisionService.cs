@@ -1,4 +1,5 @@
 ﻿using Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction;
+using Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models;
 using Microsoft.Azure.CognitiveServices.Vision.CustomVision.Training;
 using Microsoft.Azure.CognitiveServices.Vision.CustomVision.Training.Models;
 using Microsoft.Extensions.Options;
@@ -552,6 +553,15 @@ namespace Spectra.Model.Api.Services
             //byte[] fileBytes = System.IO.File.ReadAllBytes(_zipPath);
 
             return zipPath;
+        }
+
+        public async Task<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImagePrediction> DemoPredictFromUrl(CustomVisionProject project, string projectId, string Url, string publishedName)
+        {
+            CustomVisionPredictionClient predictionApi = AuthenticatePrediction(project.Endpoint, project.PredictionKey);
+            Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(Url);
+            var predictionResult = await predictionApi.DetectImageUrlAsync(Guid.Parse(projectId), publishedName, predictionUrl);
+
+            return predictionResult;
         }
     }
 }

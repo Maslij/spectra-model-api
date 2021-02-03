@@ -16,5 +16,9 @@ namespace Spectra.Model.Api.Models
         [JsonProperty("TrainingKey")]
         [Required]
         public string TrainingKey { get; set; }
+
+        [JsonProperty("PredictionKey")]
+        [Required]
+        public string PredictionKey { get; set; } = null;
     }
 }
