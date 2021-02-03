@@ -111,7 +111,7 @@ namespace Spectra.Model.Api.Services
             List<SpectraProjectWithMetadata> mergedList =
                 projectMetaData.Join(
                         customVisionProjects,
-                        x1 => x1.ProjectId,
+                        x1 => Guid.Parse(x1.ProjectId),
                         x2 => x2.Id,
                         (x1, x2) => new SpectraProjectWithMetadata
                         {
@@ -132,10 +132,33 @@ namespace Spectra.Model.Api.Services
             return mergedList;
         }
 
-        public async Task<Project> GetProject(CustomVisionProject project, Guid projectId)
+        public async Task<SpectraProjectWithMetadata> GetProject(CustomVisionProject project, string projectId)
         {
             CustomVisionTrainingClient trainingApi = AuthenticateTraining(project.Endpoint, project.TrainingKey);
-            return await trainingApi.GetProjectAsync(projectId);
+
+            var spectraProjectCollection = _database.GetCollection<SpectraProject>("spectra-projects");
+            
+            var projectMetaData = spectraProjectCollection.Find(x => x.ProjectId == projectId).FirstOrDefault();
+
+            // Get all the Custom Vision projects
+            var customVisionProject = await trainingApi.GetProjectAsync(Guid.Parse(projectId));
+
+            var mergedObject = new SpectraProjectWithMetadata
+            {
+                Category = projectMetaData.Category,
+                DemoUrls = projectMetaData.DemoUrls,
+                Created = customVisionProject.Created,
+                Description = customVisionProject.Description,
+                DrModeEnabled = customVisionProject.DrModeEnabled,
+                Id = customVisionProject.Id,
+                LastModified = customVisionProject.LastModified,
+                Name = customVisionProject.Name,
+                Settings = customVisionProject.Settings,
+                Status = customVisionProject.Status,
+                ThumbnailUri = customVisionProject.ThumbnailUri
+            };
+
+            return mergedObject;
         }
 
         public static bool DoesFileExist(string fileName, CloudBlobClient cloudBlobClient, string containerReference)

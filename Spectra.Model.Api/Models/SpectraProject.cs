@@ -16,7 +16,7 @@ namespace Spectra.Model.Api.Models
 
         [BsonElement("project_id")]
         [JsonProperty("project_id")]
-        public Guid ProjectId { get; set; }
+        public string ProjectId { get; set; }
 
         [BsonElement("category")]
         [JsonProperty("category")]

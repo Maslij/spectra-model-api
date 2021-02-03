@@ -28,6 +28,13 @@ namespace Spectra.Model.Api.Controllers
             return await _customVisionService.GetProjects(customVisionProject);
         }
 
+        [Route("project/{id}")]
+        [HttpGet]
+        public async Task<SpectraProjectWithMetadata> GetProject(CustomVisionProject customVisionProject, string id)
+        {
+            return await _customVisionService.GetProject(customVisionProject, id);
+        }
+
         [Route("project/{id}/images/customvision/{iteration}")]
         [HttpGet]
         public async Task<object> GetProjectWithImagesAndRegions(CustomVisionProject customVisionProject, Guid id, Guid iteration)
