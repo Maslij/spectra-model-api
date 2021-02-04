@@ -37,7 +37,7 @@ namespace Spectra.Model.Api.Controllers
 
         [Route("project/{id}/model/{model}")]
         [HttpPost]
-        public async Task<Uri> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string id, string model)
+        public async Task<string> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string id, string model)
         {
             return await _customVisionService.DemoPredictFromUrl(customVisionPrediction, id, model);
         }

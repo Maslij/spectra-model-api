@@ -556,7 +556,7 @@ namespace Spectra.Model.Api.Services
             return zipPath;
         }
 
-        public async Task<Uri> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
+        public async Task<string> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
         {
             CustomVisionPredictionClient predictionApi = AuthenticatePrediction(customVisionPrediction.Endpoint, customVisionPrediction.PredictionKey);
             Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(customVisionPrediction.ImageUrl);
@@ -620,7 +620,7 @@ namespace Spectra.Model.Api.Services
             if (!imageUrl)
                 await cloudBlockBlobImage.UploadFromFileAsync($"{_startPath}{_fileNamePredicted}");
 
-            return cloudBlockBlobImage.Uri;
+            return cloudBlockBlobImage.Uri.ToString();
         }
     }
 }
