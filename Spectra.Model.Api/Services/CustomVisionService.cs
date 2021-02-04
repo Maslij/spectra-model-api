@@ -365,7 +365,7 @@ namespace Spectra.Model.Api.Services
                 Folder = "",
                 FileName = _xmlFileName,
                 Source = new Source { Database = "" },
-                Size = new Size
+                Size = new Models.Pascal.Size
                 {
                     Depth = 3,
                     Width = image.Width,
@@ -556,26 +556,71 @@ namespace Spectra.Model.Api.Services
             return zipPath;
         }
 
-        public async Task<IList<PredictionModel>> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
+        public async Task<Uri> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
         {
             CustomVisionPredictionClient predictionApi = AuthenticatePrediction(customVisionPrediction.Endpoint, customVisionPrediction.PredictionKey);
             Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(customVisionPrediction.ImageUrl);
             var predictionResult = await predictionApi.DetectImageUrlAsync(Guid.Parse(projectId), publishedName, predictionUrl);
             IList<PredictionModel> predictionsToKeep = new List<PredictionModel>();
 
-            
-            // Retrieve only relevant predictions
-            foreach(var prediction in predictionResult.Predictions)
+            // Download the image first
+            // Set the file metadata
+            var _path = Path.GetTempPath();
+            var _startPath = $"{_path}/Images/";
+            string _fileName = $"{projectId}-demo-original.jpg";
+            string _fileNamePredicted = $"{projectId}-demo-prediction.jpg";
+
+            using (WebClient downloader = new WebClient())
             {
-                if(prediction.Probability > .6)
-                {
-                    predictionsToKeep.Add(prediction);
-                }
+                downloader.DownloadFile(new Uri(customVisionPrediction.ImageUrl), $"{_startPath}{_fileName}");
             }
 
+            // Load the image (probably from your stream)
+            using (var image = System.Drawing.Image.FromFile($"{_startPath}{_fileName}"))
+            {
+                using (System.Drawing.Graphics g = System.Drawing.Graphics.FromImage(image))
+                {
+                    System.Drawing.Color customColor = System.Drawing.Color.FromArgb(50, System.Drawing.Color.Green);
+
+                    using (System.Drawing.Brush br = new System.Drawing.SolidBrush(customColor))
+                    {
+
+                        // Retrieve only relevant predictions
+                        foreach (var prediction in predictionResult.Predictions)
+                        {
+                            if (prediction.Probability > .6)
+                            {
+                                var Xmin = prediction.BoundingBox.Left * image.Width;
+                                var Ymin = prediction.BoundingBox.Top * image.Height;
+                                var Xmax = prediction.BoundingBox.Width * image.Width;
+                                var Ymax = prediction.BoundingBox.Height * image.Height;
 
 
-            return predictionsToKeep;
+                                predictionsToKeep.Add(prediction);
+                                // Create a new pen.
+                                System.Drawing.Pen skyBluePen = new System.Drawing.Pen(System.Drawing.Brushes.Lime);
+                                // Set the pen's width.
+                                skyBluePen.Width = 8.0F;
+                                g.DrawRectangle(skyBluePen, (int)Xmin, (int)Ymin, (int)Xmax,(int)Ymax);
+                            }
+                        }
+                        image.Save($"{_startPath}{_fileNamePredicted}");
+                    }
+
+                }
+
+            }
+            // Set the blob client
+            blobClient = InitiateBlobClient();
+            // Set the container if it doesn't exist
+            cloudBlobContainer = await FindOrCreateBlob(blobClient, Guid.Parse(projectId));
+            CloudBlockBlob cloudBlockBlobImage = cloudBlobContainer.GetBlockBlobReference(_fileNamePredicted);
+            // Check if the file already exits in the blob, if it doesn't, upload it.
+            bool imageUrl = DoesFileExist(_fileNamePredicted, blobClient, projectId.ToString());
+            if (!imageUrl)
+                await cloudBlockBlobImage.UploadFromFileAsync($"{_startPath}{_fileNamePredicted}");
+
+            return cloudBlockBlobImage.Uri;
         }
     }
 }

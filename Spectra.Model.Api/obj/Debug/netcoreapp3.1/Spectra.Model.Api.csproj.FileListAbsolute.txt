@@ -67,3 +67,8 @@ C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netco
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\runtimes\win\native\libzstd.dll
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\runtimes\win\native\snappy32.dll
 C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\runtimes\win\native\snappy64.dll
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\Microsoft.Win32.SystemEvents.dll
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\System.Drawing.Common.dll
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\runtimes\win\lib\netcoreapp3.0\Microsoft.Win32.SystemEvents.dll
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\runtimes\unix\lib\netcoreapp3.0\System.Drawing.Common.dll
+C:\Users\Alec\source\spectra\Spectra.Model.Api\Spectra.Model.Api\bin\Debug\netcoreapp3.1\runtimes\win\lib\netcoreapp3.0\System.Drawing.Common.dll

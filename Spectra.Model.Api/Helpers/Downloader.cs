@@ -13,15 +13,16 @@ namespace Spectra.Model.Api.Helpers
 
         public void DownloadFile(string address, string location)
         {
-            WebClient client = new WebClient();
-            Uri Uri = new Uri(address);
-            _completed = false;
+            using (WebClient client = new WebClient())
+            {
+                Uri Uri = new Uri(address);
+                _completed = false;
 
-            client.DownloadFileCompleted += new AsyncCompletedEventHandler(Completed);
+                client.DownloadFileCompleted += new AsyncCompletedEventHandler(Completed);
 
-            client.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgress);
-            client.DownloadFileAsync(Uri, location);
-
+                client.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgress);
+                client.DownloadFileAsync(Uri, location);
+            }
         }
 
         public bool DownloadCompleted { get { return _completed; } }
