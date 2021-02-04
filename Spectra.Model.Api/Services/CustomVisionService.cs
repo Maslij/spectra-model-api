@@ -556,13 +556,26 @@ namespace Spectra.Model.Api.Services
             return zipPath;
         }
 
-        public async Task<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImagePrediction> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
+        public async Task<IList<PredictionModel>> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string projectId, string publishedName)
         {
             CustomVisionPredictionClient predictionApi = AuthenticatePrediction(customVisionPrediction.Endpoint, customVisionPrediction.PredictionKey);
             Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl predictionUrl = new Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImageUrl(customVisionPrediction.ImageUrl);
             var predictionResult = await predictionApi.DetectImageUrlAsync(Guid.Parse(projectId), publishedName, predictionUrl);
+            IList<PredictionModel> predictionsToKeep = new List<PredictionModel>();
 
-            return predictionResult;
+            
+            // Retrieve only relevant predictions
+            foreach(var prediction in predictionResult.Predictions)
+            {
+                if(prediction.Probability > .6)
+                {
+                    predictionsToKeep.Add(prediction);
+                }
+            }
+
+
+
+            return predictionsToKeep;
         }
     }
 }

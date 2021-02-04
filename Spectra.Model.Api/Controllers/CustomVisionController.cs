@@ -37,7 +37,7 @@ namespace Spectra.Model.Api.Controllers
 
         [Route("project/{id}/model/{model}")]
         [HttpPost]
-        public async Task<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.ImagePrediction> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string id, string model)
+        public async Task<IList<Microsoft.Azure.CognitiveServices.Vision.CustomVision.Prediction.Models.PredictionModel>> DemoPredictFromUrl(CustomVisionPrediction customVisionPrediction, string id, string model)
         {
             return await _customVisionService.DemoPredictFromUrl(customVisionPrediction, id, model);
         }
