@@ -25,5 +25,9 @@ namespace Spectra.Model.Api.Models
         [BsonElement("demo_urls")]
         [JsonProperty("demo_urls")]
         public string[] DemoUrls { get; set; }
+
+        [BsonElement("hero_url")]
+        [JsonProperty("hero_url")]
+        public string HeroUrl { get; set; }
     }
 }

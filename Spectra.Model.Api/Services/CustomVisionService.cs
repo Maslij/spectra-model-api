@@ -119,6 +119,7 @@ namespace Spectra.Model.Api.Services
                         {
                             Category = x1.Category,
                             DemoUrls = x1.DemoUrls,
+                            HeroUrl = x1.HeroUrl,
                             Created = x2.Created,
                             Description = x2.Description,
                             DrModeEnabled = x2.DrModeEnabled,
