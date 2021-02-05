@@ -150,6 +150,7 @@ namespace Spectra.Model.Api.Services
             {
                 Category = projectMetaData.Category,
                 DemoUrls = projectMetaData.DemoUrls,
+                HeroUrl = projectMetaData.HeroUrl,
                 Created = customVisionProject.Created,
                 Description = customVisionProject.Description,
                 DrModeEnabled = customVisionProject.DrModeEnabled,
